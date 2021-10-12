@@ -1,0 +1,9 @@
+
+
+out_path = "params"
+exp_name = "test-v3"
+down_layer_sizes = [1,32,64,128,256]
+up_layer_sizes = [32,64,128,256,512]
+skip_layer_sizes = [32,32,64,128,256]
+LR = 1e-4
+
