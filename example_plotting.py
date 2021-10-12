@@ -1,7 +1,6 @@
 
 import matplotlib.pyplot as plt
 
-from nilearn import plotting
 import seaborn_image as isns
 
 #vol should be a 3-d tensor (so single channel image, with X,Y,Z axes)
