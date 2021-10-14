@@ -25,14 +25,20 @@ class fetal_torch_iter(Dataset):
 
     self.noise_transformer = noise_transformer
 
+    #from tqdm import tqdm
+    #print("beginning preload")
+    #for subj_idx in tqdm(range(len(self.subjects_list))):
+    #    self.subjects_list[subj_idx].load()
+
   def __len__(self):
     return len(self.subj_dataset)
 
   def __getitem__(self, index : int):
-    subj = self.subj_dataset[index]
-    subj.load()
-    vol = subj["vol"]
-    noised_vol = self.noise_transformer(vol)
+    with torch.no_grad():
+      subj = self.subj_dataset[index]
+      subj.load()
+      vol = subj["vol"]
+      noised_vol = self.noise_transformer(vol)
     return vol.data.float().detach(), noised_vol.data.float().detach()
 
 def create_L_mask( vol_size, L ):
@@ -57,6 +63,62 @@ def sha_tio_multivol( vol, sha_gen ):
   sha_output,dp_vol = sha_gen(vol)
   output = torch.cat((sha_output*vol,torch.sigmoid(dp_vol)),axis=0) 
   return output
+
+def get_fetal_torch_iterator_large(n_train_subj, return_field=False):
+
+  ##PARAMS
+  vol_size = [128,128,128]
+  mask = create_L_mask(vol_size, 20)
+
+  min_sha = 0.75
+  max_sha = 0.85
+  sha_width = 1.5
+  make_rand_sha = lambda : min_sha + torch.rand(1)*(max_sha - min_sha)
+  sha_func = lambda x: torch.clip(1 - make_rand_sha()*torch.exp( - (x*x)/(sha_width) ), min=0.0)
+  sigma = 0.05
+  #sha_func = lambda x: torch.clip(1 - 0.95*torch.exp( -x*x ), min=0.0)
+
+  ##END PARAMS
+
+  giant_list_of_epi_vols = []
+  N_train = 0
+  for subj_idx, subj in enumerate(fdi.FDSubjIterator()):
+    n_frames_epi = subj.get_EPI_split_nifti_num_frames()
+
+    for frame_idx in range(n_frames_epi):
+
+      epi_path = subj.get_EPI_vol( frame_idx, just_path=True )
+      giant_list_of_epi_vols.append(epi_path)
+
+      if subj_idx < n_train_subj:
+        N_train += 1
+
+      #print(epi_path)
+
+  #create transformer
+  downsample = tio.Lambda(
+    lambda vol : isotropic_resample( vol, 4.0/3.0 )
+  )
+  #downsample = tio.RandomAnisotropy(axes=(0,1,2), downsampling=(1,4.0/3.0))
+  #TODO: move affine to preproc?
+  #affine = tio.RandomAffine(degrees=90,translation=10)
+  rnorm_tio = tio.Lambda(
+    lambda vol : torch.clip(vol + sigma * torch.normal(torch.zeros_like(vol)), min=0)
+  )
+
+  sha_gen = sha.SHA_Generator_Torch( [1] + vol_size, sha_func, return_field=return_field )
+
+  if return_field:
+    sha_tio = tio.Lambda( lambda vol : sha_tio_multivol( vol, sha_gen ) )
+  else:
+    sha_tio = tio.Lambda( lambda vol : sha_gen(vol) * vol )
+
+  noise_model = tio.Compose((downsample, rnorm_tio, sha_tio))
+
+  return (fetal_torch_iter(vol_size, giant_list_of_epi_vols[:N_train], noise_model),
+    fetal_torch_iter(vol_size, giant_list_of_epi_vols[N_train:], noise_model))
+
+
 
 def get_fetal_torch_iterator(n_train_subj, return_field=False):
 
