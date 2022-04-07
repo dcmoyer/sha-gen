@@ -10,6 +10,8 @@ import spin_history_artifacts as sha
 import utils
 from torch.utils.data import Dataset
 
+# all about loading data, preprocessing it for training
+# use right before and during training of model
 
 class fetal_torch_iter(Dataset):
   def __init__(self, vol_size, list_of_vol_paths, noise_transformer):
@@ -143,6 +145,9 @@ def get_fetal_torch_iterator(n_train_subj, return_field=False):
 
     for frame_idx in range(n_frames_epi):
       epi_path = subj.get_EPI_vol( frame_idx, just_path=True )
+      # import nibabel as nib
+      # scanblock = nib.load(epi_path).get_fdata()
+      # break
       giant_list_of_epi_vols.append(epi_path)
 
       if subj_idx < n_train_subj:
@@ -170,8 +175,10 @@ def get_fetal_torch_iterator(n_train_subj, return_field=False):
 
   noise_model = tio.Compose((downsample, rnorm_tio, sha_tio))
 
-  return (fetal_torch_iter(vol_size, giant_list_of_epi_vols[:N_train], noise_model),
-    fetal_torch_iter(vol_size, giant_list_of_epi_vols[N_train:], noise_model))
+  return (
+    fetal_torch_iter(vol_size, giant_list_of_epi_vols[:N_train], noise_model), #training dataset
+    fetal_torch_iter(vol_size, giant_list_of_epi_vols[N_train:], noise_model) #validation dataset
+  )
 
 
 if __name__ == "__main__":
