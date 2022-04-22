@@ -7,7 +7,13 @@ import unet_arch
 import ae_arch
 import re
 
-import example_plotting
+import matplotlib.pyplot as plt
+import seaborn_image as isns
+import nibabel as nib
+import fetal_data_iterator as fdi
+import numpy as np
+
+# import example_plotting
 
 #import warnings
 #warnings.filterwarnings("ignore", category=UserWarning)
@@ -131,15 +137,23 @@ loss_func = torch.nn.MSELoss()
 # else:
 #   last_epoch = 0
 # val_loss = 0
+
+def plotting_function(vol,x,y,z,ax,exp):
+  # vol is a 3D array and the ones coming out of the nework is a 5D array with batch and channel dims [0][0][h][w] or [0,0,...] gives 3D vol
+  isns.imgplot( np.transpose(vol[x,:,:]), cbar=False, gray=True, ax=ax[0])
+  isns.imgplot( np.transpose(vol[:,y,:]), cbar=False, gray=True, ax=ax[1])
+  isns.imgplot( vol[:,:,z], cbar=False, gray=True, ax=ax[2])
+  plt.savefig(f"/data/vision/polina/scratch/haleysan/sha-gen/image_plots/data_{exp}.png")
+          
 val_loss_list = []
-for epoch in range(0, 105, 5):
+for epoch in range(998, 1000, 1):
 
   print(f"epoch {epoch}", flush=True)
 
   val_loss = 0
   N = 0
 
-  # net_obj.load_state_dict(torch.load(f"{out_path}/{exp_name}/{epoch}.pth"))
+  net_obj.load_state_dict(torch.load(f"{out_path}/{exp_name}/{epoch}.pth"))
 
   for d_idx,batch in enumerate(val_loader):
 
@@ -147,21 +161,34 @@ for epoch in range(0, 105, 5):
       inputs = batch[1]
       outputs = batch[0]
 
-      # if epoch == 10:
-        # plotting_function(inputs,(shape[0]-1)//2,(shape[1]-1)//2,(shape[2]-1)//2,ax1, exp_name)
 
       inputs = inputs.to(device,non_blocking=True)
       outputs = outputs.to(device) #this is blocking
-      # if epoch == 10:
-      #   plotting_function(scan_block,(shape[0]-1)//2,(shape[1]-1)//2,(shape[2]-1)//2,ax1)
-      #   isns.imgplot( np.transpose(vol[x,:,:]), cbar=False, gray=True, ax=ax[0])
-      #   isns.imgplot( np.transpose(vol[:,y,:]), cbar=False, gray=True, ax=ax[1])
-      #   isns.imgplot( vol[:,:,z], cbar=False, gray=True, ax=ax[2])
-      #   plt.savefig(f"/data/vision/polina/scratch/haleysan/sha-gen/data_{exp_name}.png")
+      inputs_on_cpu = inputs.cpu().numpy()
+      # inputs = inputs.cpu().data.numpy().argmax()
 
       optimizer.zero_grad()
       net_obj.zero_grad(set_to_none=True)
       outputs_approx = net_obj.forward(inputs)
+      approx_on_cpu = outputs_approx.cpu().detach().numpy()
+
+      if epoch == 999:
+        plt.clf()
+        fig1, ax1 = plt.subplots(1,3)
+        shape = inputs_on_cpu.shape
+        # scan_block  = np.log(inputs+1)
+        name = exp_name + "_before"
+        plotting_function(inputs_on_cpu[0,0,...],(shape[2]-1)//2,(shape[3]-1)//2,(shape[4]-1)//2, ax1, name)
+        # break
+
+        # how it is reconstructed through the autoencoder
+        fig1, ax1 = plt.subplots(1,3)
+        shape = approx_on_cpu.shape
+        # scan_block  = np.log(inputs+1)
+        name = exp_name + "_after"
+        plotting_function(approx_on_cpu[0,0,...],(shape[2]-1)//2,(shape[3]-1)//2,(shape[4]-1)//2, ax1, name)
+        break
+
 
       loss_value = loss_func( outputs, outputs_approx ).mean()
       # loss_value.backward(retain_graph=True)
@@ -170,7 +197,8 @@ for epoch in range(0, 105, 5):
       val_loss += loss_value.item()*batch[0].size()[0]
       N += batch[0].size()[0]
 
-      val_loss_list.append(val_loss)
+      # print(inputs.shape)
+      # print(outputs_approx.shape)
 
       del inputs
       del outputs
@@ -180,23 +208,23 @@ for epoch in range(0, 105, 5):
         break
       # print(val_loss/N)
 
+  # val_loss_list.append(val_loss/N)
 
 
-import matplotlib.pyplot as plt
-import seaborn_image as isns
-import nibabel as nib
-import fetal_data_iterator as fdi
-import numpy as np
+# code to make plots for MSE loss
+# import example_plotting
+# print(plt.)
+plt.clf()
 
-import example_plotting
-
-xpoints = np.array([x for x in range(0,105,5)])
+xpoints = np.array([x for x in range(0,1000,5)])
 ypoints = np.array(val_loss_list)
 
 plt.plot(xpoints, ypoints)
 
 plt.xlabel("Epoch")
 plt.ylabel("MSE Loss")
+plt.title(f"Validation Loss for Experiment {exp_name}")
 
 # plt.show()
-plt.savefig(f'"/data/vision/polina/scratch/haleysan/sha-gen/MSE_loss_{exp_name}.png"')
+plt.savefig(f"/data/vision/polina/scratch/haleysan/sha-gen/MSE_loss_{exp_name}")
+
