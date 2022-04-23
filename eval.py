@@ -146,7 +146,7 @@ def plotting_function(vol,x,y,z,ax,exp):
   plt.savefig(f"/data/vision/polina/scratch/haleysan/sha-gen/image_plots/data_{exp}.png")
           
 val_loss_list = []
-for epoch in range(998, 1000, 1):
+for epoch in range(0, 1000, 5):
 
   print(f"epoch {epoch}", flush=True)
 
@@ -187,7 +187,6 @@ for epoch in range(998, 1000, 1):
         # scan_block  = np.log(inputs+1)
         name = exp_name + "_after"
         plotting_function(approx_on_cpu[0,0,...],(shape[2]-1)//2,(shape[3]-1)//2,(shape[4]-1)//2, ax1, name)
-        break
 
 
       loss_value = loss_func( outputs, outputs_approx ).mean()
@@ -208,7 +207,7 @@ for epoch in range(998, 1000, 1):
         break
       # print(val_loss/N)
 
-  # val_loss_list.append(val_loss/N)
+  val_loss_list.append(val_loss/N)
 
 
 # code to make plots for MSE loss
